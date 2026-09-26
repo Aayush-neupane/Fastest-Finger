@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import RaceTrack from './RaceTrack.tsx'
 import PartyMatch from './Party.tsx'
 import Online from './Online.tsx'
+import { confetti } from './confetti.ts'
 import { useRace } from './useRace.ts'
 import { loadBest, type Language } from './race.ts'
 import { PORTFOLIO_URL } from './site.ts'
@@ -83,7 +84,10 @@ export default function App() {
   const [onlineOn, setOnlineOn] = useState(false)
   const [count, setCount] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
   const race = useRace(lang, ghostOn)
+  // Language is locked once any race starts (words are already dealt).
+  const langLocked = race.phase !== 'menu' || partyOn || onlineOn
 
   useEffect(() => {
     localStorage.setItem('ff-lang', lang)
@@ -91,12 +95,13 @@ export default function App() {
   }, [lang])
 
   // Countdown ticks, then the race starts and the input takes focus.
+  // The extra beat on GO! keeps it readable before the race begins.
   useEffect(() => {
     if (race.phase !== 'countdown') return
     setCount(0)
     const id = window.setInterval(() => {
       setCount((c) => {
-        if (c + 1 >= COUNTDOWN.length) {
+        if (c + 1 > COUNTDOWN.length) {
           window.clearInterval(id)
           race.beginRacing()
           window.setTimeout(() => inputRef.current?.focus(), 50)
@@ -109,18 +114,31 @@ export default function App() {
   }, [race.phase])
 
   useEffect(() => {
-    if (race.phase === 'finished') setBest(loadBest(lang))
-  }, [race.phase, lang])
+    if (race.phase === 'finished') {
+      setBest(loadBest(lang))
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (race.isBest) {
+        const t = window.setTimeout(() => confetti(), 350)
+        return () => window.clearTimeout(t)
+      }
+    }
+  }, [race.phase, race.isBest, lang])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && (race.phase === 'menu' || race.phase === 'finished')) {
+      if (
+        e.key === 'Enter' &&
+        mode === 'solo' &&
+        !partyOn &&
+        !onlineOn &&
+        (race.phase === 'menu' || race.phase === 'finished')
+      ) {
         race.startCountdown()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [race])
+  }, [race, mode, partyOn, onlineOn])
 
   return (
     <main className="app-backdrop min-h-screen bg-zinc-950 text-zinc-100">
@@ -137,11 +155,11 @@ export default function App() {
               Fingers
             </p>
           </div>
-          <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/40 p-1">
-            <Pill active={lang === 'en'} onClick={() => setLang('en')}>
+          <div className={`flex items-center gap-1 rounded-full border border-white/10 bg-black/40 p-1 ${langLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            <Pill active={lang === 'en'} onClick={() => langLocked || setLang('en')}>
               English
             </Pill>
-            <Pill active={lang === 'ne'} onClick={() => setLang('ne')}>
+            <Pill active={lang === 'ne'} onClick={() => langLocked || setLang('ne')}>
               नेपाली
             </Pill>
           </div>
@@ -198,9 +216,14 @@ export default function App() {
                   Start race
                 </button>
                 {best && (
-                  <p className="mt-4 font-mono text-xs text-zinc-500">
-                    Personal best · {best.wpm} wpm · {best.acc}% acc
-                  </p>
+                  <>
+                    <p className="mt-4 font-mono text-xs text-zinc-500">
+                      Personal best · {best.wpm} wpm · {best.acc}% acc
+                    </p>
+                    <p className="mt-2 font-mono text-[11px] text-zinc-600">
+                      Press Enter to start · type each word + space
+                    </p>
+                  </>
                 )}
               </>
             ) : (
@@ -351,7 +374,7 @@ export default function App() {
         )}
 
         {race.phase === 'finished' && (
-          <div className="mt-8 rounded-2xl border border-yellow-400/30 bg-yellow-400/5 p-6 text-center">
+          <div ref={resultsRef} className="mt-8 rounded-2xl border border-yellow-400/30 bg-yellow-400/5 p-6 text-center">
             {race.isBest && (
               <p className="font-mono text-xs uppercase tracking-[0.3em] text-yellow-400">
                 New personal best

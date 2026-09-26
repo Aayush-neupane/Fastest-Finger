@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import RaceTrack from './RaceTrack.tsx'
 import { Word } from './App.tsx'
+import { confetti } from './confetti.ts'
 import { useRace } from './useRace.ts'
 import { buildRace, type Language, type RaceStats } from './race.ts'
 
@@ -35,7 +36,7 @@ function PartyTurn({
     setCount(0)
     const id = window.setInterval(() => {
       setCount((c) => {
-        if (c + 1 >= COUNTDOWN.length) {
+        if (c + 1 > COUNTDOWN.length) {
           window.clearInterval(id)
           race.beginRacing()
           window.setTimeout(() => inputRef.current?.focus(), 50)
@@ -145,6 +146,63 @@ function PartyTurn({
   )
 }
 
+function WinnerStandings({
+  sorted,
+  onRematch,
+  onExit,
+}: {
+  sorted: { name: string; stats: RaceStats }[]
+  onRematch: () => void
+  onExit: () => void
+}) {
+  useEffect(() => {
+    const t = window.setTimeout(() => confetti(110), 300)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  const winner = sorted[0]
+  return (
+    <div className="mt-8 flex flex-1 flex-col gap-6">
+      <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/5 p-6 text-center">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-yellow-400">
+          Winner
+        </p>
+        <p className="mt-2 text-4xl font-bold">{winner?.name}</p>
+        <p className="mt-1 font-mono text-xs tabular-nums text-zinc-400">
+          {winner?.stats.wpm} wpm · {winner?.stats.acc}% acc
+        </p>
+      </div>
+      <ol className="divide-y divide-white/10 rounded-2xl border border-white/10">
+        {sorted.map((r, i) => (
+          <li key={r.name} className="flex items-center gap-3 px-5 py-3.5">
+            <span className="font-mono text-sm tabular-nums text-zinc-500">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <span className="font-semibold">{r.name}</span>
+            <span className="ml-auto font-mono text-sm tabular-nums text-zinc-400">
+              {r.stats.wpm} wpm · {r.stats.acc}%
+            </span>
+          </li>
+        ))}
+      </ol>
+      <div className="flex flex-wrap justify-center gap-3">
+        <button
+          onClick={onRematch}
+          className="rounded-full bg-yellow-400 px-6 py-2.5 text-sm font-semibold text-zinc-950 transition-transform hover:scale-105"
+        >
+          Rematch
+        </button>
+        <button
+          onClick={onExit}
+          className="rounded-full border border-white/15 px-6 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-white/5"
+        >
+          Menu
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function PartyMatch({
   names,
   lang,
@@ -155,6 +213,7 @@ export default function PartyMatch({
   onExit: () => void
 }) {
   const [words, setWords] = useState<string[]>(() => buildRace(lang))
+  const [matchLang] = useState<Language>(lang)
   const [turn, setTurn] = useState(0)
   const [results, setResults] = useState<(RaceStats | null)[]>(() => names.map(() => null))
   const done = turn >= names.length
@@ -165,52 +224,18 @@ export default function PartyMatch({
     .sort((a, b) => b.stats.wpm - a.stats.wpm || b.stats.acc - a.stats.acc)
 
   const rematch = () => {
-    setWords(buildRace(lang))
+    setWords(buildRace(matchLang))
     setTurn(0)
     setResults(names.map(() => null))
   }
 
   if (done) {
-    const winner = sorted[0]
     return (
-      <div className="mt-8 flex flex-1 flex-col gap-6">
-        <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/5 p-6 text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-yellow-400">
-            Winner
-          </p>
-          <p className="mt-2 text-4xl font-bold">{winner?.name}</p>
-          <p className="mt-1 font-mono text-xs tabular-nums text-zinc-400">
-            {winner?.stats.wpm} wpm · {winner?.stats.acc}% acc
-          </p>
-        </div>
-        <ol className="divide-y divide-white/10 rounded-2xl border border-white/10">
-          {sorted.map((r, i) => (
-            <li key={r.name} className="flex items-center gap-4 px-5 py-3.5">
-              <span className="font-mono text-sm tabular-nums text-zinc-500">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <span className="font-semibold">{r.name}</span>
-              <span className="ml-auto font-mono text-sm tabular-nums text-zinc-400">
-                {r.stats.wpm} wpm · {r.stats.acc}%
-              </span>
-            </li>
-          ))}
-        </ol>
-        <div className="flex flex-wrap justify-center gap-3">
-          <button
-            onClick={rematch}
-            className="rounded-full bg-yellow-400 px-6 py-2.5 text-sm font-semibold text-zinc-950 transition-transform hover:scale-105"
-          >
-            Rematch
-          </button>
-          <button
-            onClick={onExit}
-            className="rounded-full border border-white/15 px-6 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-white/5"
-          >
-            Menu
-          </button>
-        </div>
-      </div>
+      <WinnerStandings
+        sorted={sorted}
+        onRematch={rematch}
+        onExit={onExit}
+      />
     )
   }
 
@@ -218,7 +243,7 @@ export default function PartyMatch({
     <PartyTurn
       key={`${turn}-${words.join('').length}`}
       words={words}
-      lang={lang}
+      lang={matchLang}
       playerName={names[turn]}
       turnLabel={`Turn ${turn + 1} of ${names.length}`}
       onDone={(stats) => {

@@ -13,10 +13,9 @@ export function useRace(lang: Language, ghostOn: boolean, fixedWords: string[] |
   const [finishedAt, setFinishedAt] = useState<number | null>(null)
   const [now, setNow] = useState(Date.now())
   const [isBest, setIsBest] = useState(false)
+  const [ghostPace, setGhostPace] = useState<number | null>(null)
   const timerRef = useRef<number | null>(null)
   const elapsedRef = useRef(0)
-
-  const ghost = useMemo(() => (ghostOn ? ghostCps(lang) : null), [ghostOn, lang, phase])
 
   const stopTick = useCallback(() => {
     if (timerRef.current !== null) {
@@ -54,12 +53,13 @@ export function useRace(lang: Language, ghostOn: boolean, fixedWords: string[] |
   )
   const progress = totalChars > 0 ? Math.min(1, typedChars / totalChars) : 0
   const ghostProgress =
-    ghost !== null && startedAt !== null
-      ? Math.min(1, (elapsedSec * ghost) / Math.max(totalChars, 1))
+    ghostPace !== null && startedAt !== null
+      ? Math.min(1, (elapsedSec * ghostPace) / Math.max(totalChars, 1))
       : null
 
   const startCountdown = useCallback(() => {
     setWords(fixedWords ?? buildRace(lang))
+    setGhostPace(ghostOn ? ghostCps(lang) : null)
     setIndex(0)
     setInput('')
     setSubmitted([])
@@ -67,7 +67,7 @@ export function useRace(lang: Language, ghostOn: boolean, fixedWords: string[] |
     setFinishedAt(null)
     setIsBest(false)
     setPhase('countdown')
-  }, [lang, fixedWords])
+  }, [lang, fixedWords, ghostOn])
 
   const beginRacing = useCallback(() => {
     setStartedAt(Date.now())
