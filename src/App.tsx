@@ -413,7 +413,7 @@ export default function App() {
             className="inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-500 transition-colors hover:text-zinc-100"
           >
             <img
-              src="/logotrp.png"
+              src="/logo.svg"
               alt="Aayush Neupane"
               width={28}
               height={28}
